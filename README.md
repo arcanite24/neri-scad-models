@@ -41,6 +41,8 @@ No angled or decorative support shapes are required.
    - `"ground_leg"`
    - `"level0_front_leg"`
    - `"ground_legs_set"` (one leg length for each required level)
+   - `"all_parts"` (one of each part, non-overlapping, print-oriented)
+   - `"required_parts"` (full quantity layout for current parameters)
 
 ## Core Parameters
 
@@ -93,6 +95,10 @@ Level indexing behavior with default offset:
 5. Build staircase by connecting each shelf with two `riser_post` parts.
 6. Add `ground_leg` parts at enabled levels for self-standing rigidity.
 7. Add the `level0_front_leg` pair into the front bottom sockets of shelf `i=0`.
+
+If you prefer to export everything in one shot, use:
+
+- `view_mode = "required_parts"` to generate the full quantity layout.
 
 ## Notes
 

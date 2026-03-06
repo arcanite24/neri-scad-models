@@ -21,7 +21,7 @@ All parts are box-based and support-free in default print orientation.
 // -----------------------------
 
 view_mode = "assembly";
-// "assembly", "shelf_panel", "riser_post", "ground_leg", "level0_front_leg", "ground_legs_set", "all_parts"
+// "assembly", "shelf_panel", "riser_post", "ground_leg", "level0_front_leg", "ground_legs_set", "all_parts", "required_parts"
 
 preview_fast = true;
 $fn = preview_fast ? 24 : 64;
@@ -65,7 +65,7 @@ peg_tolerance = 0.15;
 socket_clearance = 0.25;
 top_socket_depth = 2.0;
 bottom_socket_depth = 2.4;
-sockets_through_panel = false; // if true, socket cuts go completely through shelf panels
+sockets_through_panel = true; // if true, socket cuts go completely through shelf panels
 
 // Straight riser post
 riser_body_width = 5;
@@ -78,8 +78,8 @@ ground_legs_include_level0 = false; // include base level too
 ground_leg_setback = 0;          // 0 = vertical, >0 leans backwards
 ground_leg_width = 5;
 ground_leg_depth = 5;
-ground_leg_foot_width = 20;
-ground_leg_foot_depth = 20;
+ground_leg_foot_width = 5;
+ground_leg_foot_depth = 5;
 ground_leg_foot_height = 5;
 
 // Extra front support on shelf index i=0.
@@ -288,13 +288,15 @@ module riser_post_print() {
 }
 
 module ground_leg_print(drop = preview_leg_drop) {
-    // Lift so the foot sits on Z=0.
-    translate([0, 0, drop + ground_leg_foot_height]) ground_leg(drop = drop);
+    // Print horizontally to avoid very tall Z parts.
+    z_lift = max(ground_leg_width, ground_leg_foot_width) / 2;
+    translate([0, 0, z_lift]) rotate([0, -90, 0]) ground_leg(drop = drop);
 }
 
 module level0_front_leg_print(drop = level0_vertical_offset) {
-    // Lift so the foot sits on Z=0.
-    translate([0, 0, drop + ground_leg_foot_height]) level0_front_leg(drop = drop);
+    // Print horizontally to match other legs.
+    z_lift = max(ground_leg_width, ground_leg_foot_width) / 2;
+    translate([bottom_socket_depth, 0, z_lift]) rotate([0, -90, 0]) level0_front_leg(drop = drop);
 }
 
 module ground_legs_set_layout() {
@@ -357,16 +359,65 @@ module assembly() {
 }
 
 module all_parts_layout() {
-    translate([0, 0, 0]) shelf_panel();
+    // Keep "all_parts" always print-oriented for clean slicing previews.
+    row_gap = max(ground_leg_foot_depth + 2 * abs(ground_leg_setback), max(riser_body_depth, ground_leg_depth)) + 20;
+    y_riser = shelf_depth + 25;
+    y_ground = y_riser + row_gap;
+    y_front = y_ground + row_gap;
 
-    if (part_print_orientation) {
-        translate([0, shelf_depth + 30, 0]) riser_post_print();
-        translate([45, shelf_depth + 30, 0]) ground_leg_print();
-        translate([90, shelf_depth + 30, 0]) level0_front_leg_print();
-    } else {
-        translate([0, shelf_depth + 30, 0]) riser_post();
-        translate([45, shelf_depth + 30, preview_leg_drop]) ground_leg();
-        translate([90, shelf_depth + 30, level0_vertical_offset]) level0_front_leg();
+    translate([0, 0, 0]) shelf_panel();
+    translate([0, y_riser, 0]) riser_post_print();
+    translate([0, y_ground, 0]) ground_leg_print(drop = preview_leg_drop);
+    translate([0, y_front, 0]) level0_front_leg_print(drop = level0_vertical_offset);
+}
+
+module required_parts_layout() {
+    // Full quantity layout for current parameters.
+    layout_gap = 12;
+    row_gap = max(ground_leg_foot_depth + 2 * abs(ground_leg_setback), max(riser_body_depth, ground_leg_depth)) + 20;
+
+    y_shelf = 0;
+    y_riser = shelf_depth + 25;
+    y_ground = y_riser + row_gap;
+    y_front = y_ground + row_gap;
+
+    // Shelves
+    shelf_spacing = shelf_width + layout_gap;
+    for (i = [0 : levels - 1]) {
+        translate([i * shelf_spacing, y_shelf, 0]) shelf_panel();
+    }
+
+    // Riser posts
+    riser_len = riser_dz + top_socket_depth + bottom_socket_depth;
+    riser_spacing = riser_len + layout_gap;
+    for (i = [0 : riser_post_count() - 1]) {
+        translate([i * riser_spacing, y_riser, 0]) riser_post_print();
+    }
+
+    // Ground legs (2 per enabled level, with spacing sized for max required drop)
+    if (add_ground_legs) {
+        max_ground_leg_drop = level0_vertical_offset + (levels - 1) * level_pitch + shelf_thickness;
+        max_ground_leg_len = max_ground_leg_drop + ground_leg_foot_height + top_socket_depth;
+        pair_spacing = max_ground_leg_len + layout_gap;
+        group_spacing = 2 * pair_spacing + layout_gap;
+
+        for (idx = [0 : leg_levels_count - 1]) {
+            lvl = leg_start_level + idx;
+            drop_i = level0_vertical_offset + lvl * level_pitch + shelf_thickness;
+            x0 = idx * group_spacing;
+
+            translate([x0, y_ground, 0]) ground_leg_print(drop = drop_i);
+            translate([x0 + pair_spacing, y_ground, 0]) ground_leg_print(drop = drop_i);
+        }
+    }
+
+    // Level-0 front legs
+    if (add_level0_front_legs) {
+        front_leg_len = level0_vertical_offset + bottom_socket_depth + ground_leg_foot_height;
+        front_leg_spacing = front_leg_len + layout_gap;
+        for (i = [0 : level0_front_leg_count() - 1]) {
+            translate([i * front_leg_spacing, y_front, 0]) level0_front_leg_print();
+        }
     }
 }
 
@@ -388,6 +439,8 @@ if (view_mode == "assembly") {
     ground_legs_set_layout();
 } else if (view_mode == "all_parts") {
     all_parts_layout();
+} else if (view_mode == "required_parts") {
+    required_parts_layout();
 } else {
     echo("Unknown view_mode, falling back to assembly");
     assembly();
