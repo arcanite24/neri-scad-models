@@ -15,6 +15,7 @@ The geometry is intentionally simple:
 1. `shelf_panel` (flat plate with sockets)
 2. `riser_post` (straight connector between levels)
 3. `ground_leg` (straight leg from shelf level to table)
+4. `level0_front_leg` (front support leg for shelf index `i=0`)
 
 No angled or decorative support shapes are required.
 
@@ -38,6 +39,7 @@ No angled or decorative support shapes are required.
    - `"shelf_panel"`
    - `"riser_post"`
    - `"ground_leg"`
+   - `"level0_front_leg"`
    - `"ground_legs_set"` (one leg length for each required level)
 
 ## Core Parameters
@@ -47,6 +49,10 @@ No angled or decorative support shapes are required.
 - `run_pitch_custom`: horizontal offset per level.
 - `level_pitch_custom`: vertical offset per level.
 - `shelf_thickness`: shelf plate thickness.
+- `level0_vertical_offset_override`: first shelf Z offset.
+  - `-1` (default): auto = `level_pitch` (virtual ground level 0)
+  - `>= 0`: force exact first-shelf offset
+  - `0`: restores the old behavior (first shelf starts on ground)
 - `step_socket_side_inset`: side position of inter-level riser sockets.
 - `leg_socket_side_inset`: side position of ground-leg sockets.
 - `rear_socket_offset`: rear row position.
@@ -54,6 +60,8 @@ No angled or decorative support shapes are required.
 - `ground_legs_all_levels`: one leg pair for each upper level.
 - `ground_legs_include_level0`: include bottom level legs too.
 - `ground_leg_setback`: leg horizontal shift (0 = straight).
+- `add_level0_front_legs`: adds a pair of front legs on shelf index `i=0`.
+- `sockets_through_panel`: if `true`, socket cuts are through-holes (full panel thickness).
 - `part_print_orientation`: print-oriented single-part previews.
 
 ## Important Constraint
@@ -68,6 +76,12 @@ The script asserts if this row goes outside the shelf. If it fails:
 2. increase `shelf_depth_custom`, or
 3. reduce `rear_socket_offset`.
 
+Level indexing behavior with default offset:
+
+- Ground is virtual `level 0` (no shelf printed there).
+- First printed shelf (array index `i=0`) starts at `Z = level_pitch`.
+- Next shelves keep the same `level_pitch` separation.
+
 ## Assembly Workflow
 
 1. Print `shelf_panel x levels`.
@@ -75,8 +89,10 @@ The script asserts if this row goes outside the shelf. If it fails:
 3. Print ground legs:
    - easiest: use `view_mode = "ground_legs_set"` and export each leg size
    - quantity from BOM `echo()` in OpenSCAD console
-4. Build staircase by connecting each shelf with two `riser_post` parts.
-5. Add `ground_leg` parts at enabled levels for self-standing rigidity.
+4. Print `level0_front_leg x2` if `add_level0_front_legs = true`.
+5. Build staircase by connecting each shelf with two `riser_post` parts.
+6. Add `ground_leg` parts at enabled levels for self-standing rigidity.
+7. Add the `level0_front_leg` pair into the front bottom sockets of shelf `i=0`.
 
 ## Notes
 
